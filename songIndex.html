@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8" />
+<title>Song Search 6</title>
+<style type="text/css">
+body, input[type=text] {
+	font-family: Verdana, Geneva, sans-serif;
+}
+label {
+	font-size:x-small;
+	color:grey;
+}
+.help {
+	font-size:x-small;
+	font-style:italic;
+	color:grey;
+}
+.helpPoint {
+	color:red;
+	font-size:small;
+	font-style:italic;
+}
+.helpPoint:hover {
+	cursor:pointer;
+}
+.top {
+	vertical-align: top;
+}
+#helpFrame {
+	position:absolute;
+	top:100px;
+	left:100px;
+	width:400px;
+	height:400px;
+	z-index:10;
+	background-color:lightgreen;
+	text-align:left;
+}
+#wholeSong {
+	border: thin solid black;
+	padding: 10px;
+	background-color: pink;
+	/*position: absolute;
+	top: 100px;
+	left: 100px;*/
+	width: 415px;
+	height: 400px;
+	/* visibility: hidden; */
+	/*z-index: 10;*/
+	overflow: auto;
+}
+#searchResults {
+	width: 415px;
+	height: 400px;
+	overflow: auto;
+}
+.selected, .qSelected {
+	background-color:lightgreen;
+}
+.bibleRef {
+	font-size:small;
+	color:grey;
+}
+input:invalid { /* used for inputs using the pattern attribute */
+  border: red solid 3px;
+}
+</style>
+
+<script type="text/javascript" src="scripts/jquery-1.7.2.min.js"></script>
+<script type="text/javascript" src="scripts/taffy-min.js"></script>
+<script type="text/javascript" src="db/titles.js"></script>
+<script type="text/javascript" src="db/words.js"></script>
+<script type="text/javascript" src="db/bible.js"></script>
+<script type="text/javascript" src="db/verses.js"></script>
+
+<script type="text/javascript">
+var GLOBAL={};
+$(document).ready(function(){
+	$("#helpFrame").hide()
+	$("#titleSearch").click(doTitleSearch);
+	$("#wordsSearch").click(doWordsSearch);
+	$("#numberSearch").click(doNumberSearch);
+	$("#bibleSearch").click(doBibleIndexSearch);
+	$("#parseRef").click(doParseRef);
+	$("#fixBible").click(doFixBible)
+
+	GLOBAL.titles=TAFFY(titlesJSON)
+	GLOBAL.words=TAFFY(wordsJSON)
+	GLOBAL.bible=TAFFY(bibleJSON)
+	GLOBAL.verses=TAFFY(versesJSON)
+	
+	$("#helpFrame").hide();
+	$("#helpFrame").click(function(){$(this).hide();});
+	$("#s1,#s2,#s3,#s4").click(doHelp);
+
+}); 
+
+function doFixBible(){
+	$("#searchResults").html("");
+	GLOBAL.bible({songbook:{isString:true}}).each(function (record,recordnumber) { 
+		//console.log(record)
+		//{"songbook":"SG","book":"Genesis","chapter":1,"verse":1,"songno":312},
+			
+		var sb=record.songbook
+		if(record.songbook!="SG"){
+			var n=parseInt(record.songno)
+			if(n<=640)sb="SOF1"
+			else if(n<=1150)sb="SOF2"
+			else if(n<=1690)sb="SOF3"
+			else if(n<=2200)sb="SOF4"
+			else if(n<=2710)sb="SOF5"
+			else if(n<=3220)sb="SOF6"
+		}
+		$("#searchResults").append(sb,
+									',',record.book,
+									',',record.chapter,
+									',',record.verse,
+									',',record.songno+"<br>")
+	})
+}
+
+
+var help={
+'s1':"<h6>Pattern in Title</h6><p>Not case sensitive</p><p>Returns titles</p><p><em>Click to hide</em></p>",
+'s2':"<h6>Pattern in Words</h6><p>Can also be used as Composer search</p><p>returns titles</p><p><em>Click to hide</em></p>",
+'s3':"<h6>Song Number</h6><p>Returns whole song</p>"+
+"<p>and bible references</p>"+
+"<p><em>Click to hide</em></p>",
+'s4':"<h6>Bible Reference</h6>"+
+"<p>Either: type or paste a bible ref as a string into the top box and then press 'Use', then 'Search'<br/>"+
+"OR: fill in the lower form and press 'Search'<br>"+
+"Examples: John 3:16, John 3:16-17,<br/>John 3:16-end, 2 Cor 3:4</p>"+
+"<p>The 'to' field can be<br/>"+
+"<ol><li>left blank</li><li>a number</li><li>the word 'end'</li></ol></p>"+
+"<p>Returns titles</p><p><em>Click to hide</em></p>"
+};
+function sel(e){
+	$(".selected").removeClass("selected");
+	$("#"+e).find("td").addClass("selected");
+}
+function q(e){
+	//console.log(["q",e])
+	$(".qSelected").removeClass("qSelected");
+	$("#"+e).parents("fieldset").addClass("qSelected");
+}
+
+function doHelp(){
+	var id=$(this).attr('id');
+	//alert(['help',id]);
+	//var helpText=help[id];
+	$("#helpFrame").html(help[id]).show();
+}
+
+function doTitleSearch(){
+	q('s1');
+	var songbook=$("#songbook").val();
+	var text=$("#text").val();
+	var type=$("#type").val();
+	//var sql,sqlp;
+	var results=[]
+	if(type=="Plain"){
+		//console.log(["doTitleSearch",songbook,text])
+		GLOBAL.titles({"book":{leftnocase:songbook},"title":{likenocase:text}}).each(function (record,recordnumber) { 
+			results.push(record)
+		})
+	}
+	//console.log(["doTitleSearch",results])
+	reportTitles(results)
+}
+
+function reportTitles(results){
+    // Handle the results
+	var mess=""
+	if(results.length==0)mess="<p>Sorry, no results found</p>"
+    $("#message").html(mess)
+	$("#searchResults").html("<table></table>");
+	$("#searchResults table").append("<tr class='help'><td></td><td>"+results.length+"</td><td>titles found</td></tr>");
+    results.map(function(result,i){
+		$("#searchResults table")
+			.append("<tr id='"+i+"'><td>"
+				+result.book+"</td><td>"
+				+"<a href='javascript:sel(\""+i+"\");doNumberSearch2(\""+result.book+"\","+result.songno+")'>"+result.songno+"</a></td><td>"
+				+title(result.book,result.songno)+"</td></tr>"); //was result.title, but this now gets the extended title in the form "First line(Common title)" if available
+	})
+	$("#wholeSong").empty()
+}
+
+function doWordsSearch(){
+	q('s2');
+	var songbook=$("#songbook").val();
+	var text=$("#text2").val();
+	var type=$("#type2").val();
+	var results=[]
+	if(type=="Plain"){
+		//console.log([songbook,text])
+		GLOBAL.words({"book":{leftnocase:songbook},"words":{likenocase:text}}).each(function (record,recordnumber) { 
+			results.push(record)
+		})
+	}
+	reportWords(results)
+}
+
+function reportWords(results){
+	var mess=""
+	if(results.length==0)mess="<p>Sorry, no results found</p>"
+    $("#message").html(mess)
+	$("#searchResults").html("<table></table>");
+	$("#searchResults table").append("<tr class='help'><td></td><td>"+results.length+"</td><td>titles found</td></tr>");
+    results.map(function(result,i){
+		$("#searchResults table")
+			.append("<tr id='"+i+"'><td>"
+				+result.book+"</td><td>"
+				+"<a href='javascript:sel(\""+i+"\");doNumberSearch2(\""+result.book+"\","+result.songno+")'>"+result.songno+"</a></td><td>"
+				+title(result.book,result.songno)+"</td></tr>");
+	})
+	$("#wholeSong").empty()
+}
+
+function doNumberSearch(){
+	q('s3');
+	var songbook=$("#songbook").val();
+	var songno=parseInt($("#number").val())
+	//reportTitle(songbook,songno);
+	bibleRefsAndTitleSearch(songbook,songno)
+	doNumberSearch2(songbook,songno)
+}
+
+function bibleRefsAndTitleSearch(songbook,songno){
+	var t=title(songbook,songno)
+	var results=[]
+	GLOBAL.bible({"songbook":{leftnocase:songbook},"songno":{"==":songno}}).each(function (record,recordnumber) { 
+		results.push(record)
+	})
+	reportBibleRefsAndTitle(songbook,songno,t,results)
+}
+
+function reportBibleRefsAndTitle(songbook,songno,title,results){
+	if(title=="" && results.length==0)$("#searchResults").html("<p>Sorry, no results found</p>");
+	$("#searchResults").html("<table></table>");
+	var i="t"
+	if(results.length!=0){
+		$("#searchResults table")
+			.append("<tr><td colspan='3'>"+results[0].songbook+" "+songno+"</td></tr>"+
+					"<tr><td colspan='3'>"+title+"</td></tr>")
+		}
+    results.map(function(result,i){
+		$("#searchResults table")
+			.append("<tr>"+
+				"<td class='bibleRef'>"+result.book+"</td>"+
+				"<td class='bibleRef'>"+result.chapter+"</td>"+
+				"<td class='bibleRef'>v"+result.verse+"</td></tr>")
+	})
+	$("#wholeSong").empty()
+}
+
+function reportTitle(songbook,songno){
+	var results=[]
+	//console.log(["reportTitle",songbook,songno])
+	GLOBAL.titles({"book":{is:songbook},"songno":{is:songno}}).each(function (record,recordnumber) { 
+		results.push(record)
+	})
+	reportTitles(results)
+}
+
+function doNumberSearch2(songbook,songno){
+	var results=[]
+	//console.log([songbook,songno])
+	GLOBAL.words({"book":{leftnocase:songbook},"songno":{is:songno}}).each(function (record,recordnumber) { 
+		results.push(record)
+	})
+	reportNumbers(results)
+}
+
+function reportNumbers(results){
+	var mess=""
+	if(results.size==0)mess="<p>Sorry, no results found.</p>"
+    $("#message").html(mess)
+    results.map(function(result){
+		$("#wholeSong").html(
+			"<pre>"+
+			result.book+"\n"+
+			result.words+
+			"</pre>"
+		)
+	})
+}
+
+function lookupLastVerseNo(b,c){
+	var n=''
+	var results=[]
+	GLOBAL.verses({"book":{is:b}}).each(function (record,recordnumber) { 
+		results.push(record)
+	})
+	//console.log([b,c])
+	//console.log(results)
+	//console.log(results[0].verses)
+	if(results[0]){
+		if(c<=results[0].chapters)
+			n=results[0].verses[c-1]
+	}
+	return(n)
+}
+
+function expandFromAbbrev(bk){
+	var results=[]
+	GLOBAL.verses({"book":{leftnocase:bk}}).each(function (record,recordnumber) { 
+		results.push(record)
+	})
+	if(results[0]){
+		//console.log(results[0])
+		return(results[0].book)
+	}else{
+		alert(bk+" has not been found")
+		return(bk)
+	}
+}
+
+function isNum(str) {
+    return /^[1-9][0-9]*$/.test(str);
+}
+
+function doParseBookChapter(book_chapter){
+	pattern2=/^ *(([0-9] )?[A-Za-z]+) +([0-9]+) *$/
+	if(matches=book_chapter.match(pattern2)){
+		//console.log(matches)
+		//console.log("book",matches[1],"chapter",matches[3])
+		var book=expandFromAbbrev($.trim(matches[1])) /* eg 1 Cor for 1 Corinthians */
+		//console.log("expanded book",book)
+		var chapter=$.trim(matches[3])
+		if(!isNum(chapter)){
+			alert(chapter+" is not a valid chapter number")
+			return	
+		}
+		$("#book").val(book)
+		$("#chapter").val(chapter)			
+	}else{
+		alert(book_chapter+" needs to be: book abbrev, space, chapter")
+		return
+	}
+}
+
+function doParseRef(){
+	var ref=$("#reference").val();
+	//console.log(ref)
+	ref=$.trim(ref)
+	pattern=/(.*):(.*)/
+	if(matches=ref.match(pattern)){
+		//console.log(matches[1],matches[2])
+		var book_chapter=$.trim(matches[1])
+		var verses=$.trim(matches[2])
+
+		doParseBookChapter(book_chapter)
+		
+		pattern3=/(.*)-(.*)/
+		if(matches=verses.match(pattern3)){ /* we have a from and to verse - there is a dash */
+			//console.log(matches[1],matches[2])
+			var verseFrom=$.trim(matches[1])
+			var verseTo=$.trim(matches[2])
+			if(!isNum(verseFrom)){
+				alert(verseFrom+" is not a valid for 'from' verse")
+				return		
+			}
+			if(!(verseTo==""||isNum(verseTo)||verseTo=="end")){
+				alert(verseTo+" is not a valid for 'to' verse")
+				return		
+			}
+			$("#verseFrom").val(verseFrom)			
+			$("#verseTo").val(verseTo)			
+		}else{ /* verse-to is empty (no dash) */
+			var verseFrom=$.trim(verses)
+			$("#verseFrom").val(verseFrom)			
+			$("#verseTo").val("")			
+		}
+	}else{ /* we have book & chapter but no verses (no colon)*/
+		doParseBookChapter(ref)
+		$("#verseFrom").val("1")			
+		$("#verseTo").val("end")			
+	}
+}
+
+function doBibleIndexSearch(){
+	q('s4');
+	var songbook=$("#songbook").val();
+	var book=$("#book").val();
+	var chapter=$("#chapter").val();
+	var verseFrom=$("#verseFrom").val();
+	var verseTo=$("#verseTo").val();
+	var lastVerseNo=lookupLastVerseNo(book,chapter)
+
+	if(!isNum(verseFrom)){
+		alert(verseFrom+" is not a valid for 'from' verse")
+		return		
+	}
+	if(!(verseTo==""||isNum(verseTo)||verseTo=="end")){
+		alert(verseTo+" is not a valid for 'to' verse")
+		return		
+	}
+
+	if(verseFrom>lastVerseNo){
+		$("#verseFrom").val(lastVerseNo)
+		verseFrom=lastVerseNo
+		alert("'From' verse beyond end of chapter, changed to "+verseFrom)
+	}
+	if(verseTo=="")verseTo=verseFrom;
+	if(typeof verseTo === 'string' && verseTo.toLowerCase()=="end"){
+		verseTo=lastVerseNo
+	}else if(verseTo>lastVerseNo){
+		$("#verseTo").val(lastVerseNo)
+		verseTo=lastVerseNo
+		alert("'To' verse beyond end of chapter, changed to "+verseTo)
+	}
+	var nVerseFrom=Number(verseFrom)
+	var nVerseTo=Number(verseTo)
+	//console.log([nVerseFrom,nVerseTo])
+	if(!nVerseFrom || !nVerseTo || nVerseTo<nVerseFrom)alert("From verse "+verseFrom+" to verse "+verseTo+" doesn't make sense")
+	doBibleIndexSearch2(songbook,book,Number(chapter),Number(verseFrom),Number(verseTo));
+}
+
+function doBibleIndexSearch2(songbook,book,chapter,verseFrom,verseTo){
+	//console.log(["doBibleIndexSearch2",songbook,book,chapter,verseFrom,verseTo])
+	var results=[]
+	//GLOBAL.bible({"songbook":{"is":songbook},"book":{is:book},"chapter":{"==":chapter},"verse":{">=":verseFrom},"verse":{"<=":verseTo}})
+	GLOBAL.bible({"songbook":{"leftnocase":songbook},"book":{is:book},"chapter":{"==":chapter},"verse":{">=":verseFrom,"<=":verseTo}})
+		.each(function(record,recordnumber){ 
+			results.push(record)
+		})
+	//console.log(results)
+	var sortedResults=results.slice()
+	sortedResults.sort(function(a,b){
+			return a.songno - b.songno
+		})
+	var uniqResults=sortedResults
+		.reduce(function(a,b){ // a is the accumulatot array, b is an element of the array to be reduced
+    		if (a.length==0 || a.slice(-1)[0].songno !== b.songno) a.push(b) // slice(-1)[0] means last item in array without removing it (like .pop())
+    		return a
+  		},[]) // this empty array becomes the starting value for a
+  
+	//console.log([results,sortedResults,uniqResults])
+	reportBibleIndexResults(uniqResults)
+}
+
+function reportBibleIndexResults(results){
+	var mess=""
+	if(results.length==0)mess="<p>Sorry, no results found</p>"
+    $("#message").html(mess)
+	$("#searchResults").html("<table></table>");
+	$("#searchResults table").append("<tr class='help'><td></td><td>"+results.length+"</td><td>titles found</td></tr>");
+    results.map(function(result,i){
+		$("#searchResults table")
+			.append("<tr id='"+i+"'><td>"
+				+result.songbook+"</td><td>"
+				+"<a href='javascript:sel(\""+i+"\");doNumberSearch2(\""+result.songbook+"\","+result.songno+")'>"+result.songno+"</a></td><td>"
+				+title(result.songbook,result.songno)+"</td></tr>");
+	})
+	$("#wholeSong").empty()
+}
+
+function title(songbook,songno){
+	var s=""
+	GLOBAL.titles({"book":{leftnocase:songbook},"songno":{"==":songno}}).each(function(record,recordnumber){ 
+			if(s){
+				s+=" ("+record.title+")"
+			}else{
+				s=record.title
+			}
+		})
+	return s
+}
+
+</script>
+</head>
+
+<body>
+<table>
+<tr>
+
+
+<!--Search for Pattern in Title-->
+<td class="top">
+<fieldset><legend>Pattern in Title <span class='helpPoint' id='s1'>?</span></legend>
+  <div>
+    <label>
+      Text
+      <input type="text" name="text" id="text" value="Jesus"/>
+    </label>
+  </div>
+  <div>
+    <label>
+      Type
+      <select id="type">
+        <option value="Plain">Plain</option>
+        <option value="Like%" disabled="disabled">Like%</option>
+        <option value="RegExp" disabled="disabled">RegExp</option>
+      </select>
+    </label>
+  </div>
+  <div>
+    <label>
+      <input type="button" name="button" id="titleSearch" value="Search" />
+    </label>
+  </div>
+  <!--<div class='help'>Not case sensitive, returns titles</div>-->
+</fieldset>
+  <div>
+    <label>
+      SongBk
+      <select id="songbook">
+        <option value="SOF">SOF 1-6</option>
+        <option value="SOF1">SOF1</option>
+        <option value="SOF2">SOF2</option>
+        <option value="SOF3">SOF3</option>
+        <option value="SOF4">SOF4</option>
+        <option value="SOF5">SOF5</option>
+        <option value="SOF6">SOF6</option>
+        <option value="SG">SG</option>
+      </select>
+    </label>
+  </div>
+
+  <!--
+  ><div>
+    <label>
+		<input type="button" name="button" id="fixBible" value="fixBible" />
+    </label>
+  </div>
+  -->
+
+</td>
+
+<!--Search for Pattern in Words-->
+<td class="top">
+<fieldset><legend>Pattern in Words <span class='helpPoint' id='s2'>?</span></legend>
+  <div>
+    <label>
+      Text
+      <input type="text" name="text" id="text2" value="Holy Spirit"/>
+    </label>
+  </div>
+  <div>
+    <label>
+      Type
+      <select id="type2">
+        <option value="Plain">Plain</option>
+        <option value="Like%" disabled="disabled">Like%</option>
+        <option value="RegExp" disabled="disabled">RegExp</option>
+      </select>
+    </label>
+  </div>
+  <div>
+    <label>
+      <input type="button" name="button" id="wordsSearch" value="Search" />
+    </label>
+  </div>
+  <!--<div class='help'>Can also be used as Composer search, returns titles</div>-->
+</fieldset>
+</td>
+
+<!--Search by Bible Ref-->
+<td class="top">
+<fieldset><legend>Bible Ref <span class='helpPoint' id='s4'>?</span></legend>
+  <div>
+  	<label>
+  		Ref
+  	</label>
+  	<input type="text" name="reference" id="reference" placeholder="eg John 3:16 or 2 Cor 3:4-end" size="25"/>
+  	<label>
+      <input type="button" name="button" id="parseRef" value="Use" />
+    </label>
+  </div>
+  <hr/>
+  <div>
+    <label>
+      Book
+      <select  name="book" id="book">
+		<option value="Genesis">Genesis</option>
+		<option value="Exodus">Exodus</option>
+		<option value="Leviticus">Leviticus</option>
+		<option value="Numbers">Numbers</option>
+		<option value="Deuteronomy">Deuteronomy</option>
+		<option value="Joshua">Joshua</option>
+		<option value="Judges">Judges</option>
+		<option value="Ruth">Ruth</option>
+		<option value="1 Samuel">1 Samuel</option>
+		<option value="2 Samuel">2 Samuel</option>
+		<option value="1 Kings">1 Kings</option>
+		<option value="2 Kings">2 Kings</option>
+		<option value="1 Chronicles">1 Chronicles</option>
+		<option value="2 Chronicles">2 Chronicles</option>
+		<option value="Ezra">Ezra</option>
+		<option value="Nehemiah">Nehemiah</option>
+		<option value="Esther">Esther</option>
+		<option value="Job">Job</option>
+		<option value="Psalms">Psalms</option>
+		<option value="Proverbs">Proverbs</option>
+		<option value="Ecclesiastes">Ecclesiastes</option>
+		<option value="Song of Songs">Song of Songs</option>
+		<option value="Isaiah">Isaiah</option>
+		<option value="Jeremiah">Jeremiah</option>
+		<option value="Lamentation">Lamentation</option>
+		<option value="Ezekiel">Ezekiel</option>
+		<option value="Daniel">Daniel</option>
+		<option value="Hosea">Hosea</option>
+		<option value="Joel">Joel</option>
+		<option value="Amos">Amos</option>
+		<option value="Obadiah">Obadiah</option>
+		<option value="Jonah">Jonah</option>
+		<option value="Micah">Micah</option>
+		<option value="Nahum">Nahum</option>
+		<option value="Habakkuk">Habakkuk</option>
+		<option value="Zephaniah">Zephaniah</option>
+		<option value="Haggai">Haggai</option>
+		<option value="Zechariah">Zechariah</option>
+		<option value="Malachi">Malachi</option>
+		<option value="Matthew">Matthew</option>
+		<option value="Mark">Mark</option>
+		<option value="Luke">Luke</option>
+		<option value="John">John</option>
+		<option value="Acts">Acts</option>
+		<option value="Romans">Romans</option>
+		<option value="1 Corinthians">1 Corinthians</option>
+		<option value="2 Corinthians">2 Corinthians</option>
+		<option value="Galatians">Galatians</option>
+		<option value="Ephesians">Ephesians</option>
+		<option value="Philippians">Philippians</option>
+		<option value="Colossians">Colossians</option>
+		<option value="1 Thessalonians">1 Thessalonians</option>
+		<option value="2 Thessalonians">2 Thessalonians</option>
+		<option value="1 Timothy">1 Timothy</option>
+		<option value="2 Timothy">2 Timothy</option>
+		<option value="Titus">Titus</option>
+		<option value="Philemon">Philemon</option>
+		<option value="Hebrews">Hebrews</option>
+		<option value="James">James</option>
+		<option value="1 Peter">1 Peter</option>
+		<option value="2 Peter">2 Peter</option>
+		<option value="1 John">1 John</option>
+		<option value="2 John">2 John</option>
+		<option value="3 John">3 John</option>
+		<option value="Jude">Jude</option>
+		<option value="Revelation">Revelation</option>
+        </select>
+    </label>
+    <label>
+      Chapter
+      <input type="text" pattern="[0-9]*" name="chapter" id="chapter" value="1" size='4' />
+    </label>
+  </div>
+  <div>
+    <label>
+      Verse
+      <input type="text" pattern="[0-9]*" name="verseFrom" id="verseFrom" value="1" size='4'/>
+    </label>
+    <label>
+      to
+      <input type="text" pattern="[0-9]*|end" name="verseTo" id="verseTo" size='4' title="number or 'end'"/>
+    </label>
+  </div>
+  <div>
+    <label>
+      <input type="button" name="button" id="bibleSearch" value="Search" />
+    </label>
+  </div>
+  <!--<div class='help'>The 'to' field can be left blank, returns titles</div>-->
+</fieldset>
+</td>
+
+
+<!--Search by Song Number-->
+<td class="top">
+<fieldset><legend>Song No <span class='helpPoint' id='s3'>?</span></legend>
+  <div>
+    <label>
+      Number
+      <input type="text" pattern="[0-9]*" name="number" id="number" value="100" size='4'/>
+    </label>
+  </div>
+  <div>
+    <label>
+      <input type="button" name="button" id="numberSearch" value="Search" />
+    </label>
+  </div>
+  <!--<div class='help'>Returns whole song</div>-->
+</fieldset>
+</td>
+
+</tr>
+</table>
+<div id="message">&nbsp;
+</div>
+<table border='1'>
+<tr>
+<td>
+<div id="searchResults">
+  <div class='help'>Results will appear here</div>
+</div>
+</td>
+<td class='top'>
+<div id="wholeSong">
+<p>Song text will go here<p>
+<br />
+
+<h2>Upgrade Feb 2022</h2>
+<h3>Bible ref as text string</h2>
+<p>If you prefer to type (or paste) 
+a complete bible reference as text (e.g. 'John 3:16'), 
+put it in the 'Ref' box and then press the 'Use' button. 
+Your reference will be scanned and the
+details placed in the fields below so then you can use the normal Search button.<br/>
+<p>The system has been upgraded to 'know' the number of verses in 
+each chapter in each book so that a 'Ref' like John 3:16-end can be used</p>
+<p>Abbreviated book names can be used as in<br/>2 Cor 3:4</p>
+<p>A ref with no verses eg 'Psalm 23' will be treated as 'Psalm 23:1-end'</p> 
+<h3>Songbook choice menu</h3>
+<p>There is now only one Songbook choice menu (rather than one for each search).
+The menu has been extended to include individual SOF books as well as 'all SOF'.</p>
+<p>For searches in SOF, the book number (1-6) is now reported</p>
+<hr/>
+<h2>Note: March 2019</h2>
+<p>Indexes have been extended to cover SOF 6</p>
+<h3>Note: March 2015</h3>
+<p>Bible search - results sorted by number and duplicates stripped out</p>
+<h3>Note: February 2015</h3>
+<p>Major enhancements:</p>
+<ul>
+	<li>Now contains all songs from SOF-5</li>
+	<li>Uses a JSON DB (speed improvement)</li>
+</ul>
+<p>Author: <a href="mailto:R.G.Stone@icloud.com">Roger Stone (R.G.Stone@icloud.com)</a></div>
+</td>
+</tr>
+</table>
+<div id="helpFrame"></div>
+</body>
+</html>
